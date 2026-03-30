@@ -5,8 +5,8 @@ program spincorr_sdss
   use iso_fortran_env, only : int64
   implicit none
 
-
-  character(*),parameter :: dir='../output/ELUCID2/image1/'
+  character(*),parameter :: mangadir='/mnt/18T/cube/usr_out/mingjiesheng/mangainfo/'  ! observation data file
+  character(*),parameter :: simudir='/mnt/18T/cube/usr_out/mingjiesheng/ELUCID_ratio2_PP/image1/'  ! constrained simulation file
 
   real,parameter :: box=500  ! simulation scale /dim, in unit of Mpc/h
   integer,parameter :: ngrid=500 ! ELUCID grid number
@@ -35,14 +35,14 @@ program spincorr_sdss
   dphi=-39.*pi/180.
   nband=1
   rm=2.0 ! mass bin ratio
-  n_rsmall=100
-  n_ratio=10
+  n_rsmall=75
+  n_ratio=1
   allocate(r_small(n_rsmall),ratio_scale(n_ratio),corr(n_rsmall,n_ratio,nband))
   do i1=1,n_rsmall
-    r_small(i1)=1.0+0.2*(i1-1)
+    r_small(i1)=0.2+0.2*(i1-1)  ! r 0.2:15
   enddo
   do i1=1,n_ratio
-    ratio_scale(i1)=1.1+0.2*(i1-1)
+    ratio_scale(i1)=1.1+0.2*(i1-1)  ! R=1.1r
   enddo
 
   print*, ''
@@ -60,8 +60,8 @@ program spincorr_sdss
   print*, '  elapsed time =',real(t2-t1)/t_rate,'secs';
 
   print*,''
-  print*,'reading SDSS catalog'
-  open(11,file=dir//'manga_cat.bin',status='old',access='stream')
+  print*,'reading MaNGA catalog'
+  open(11,file=mangadir//'manga_cat_EG_group_rsd.bin',status='old',access='stream')
   read(11) nhalo
   print*,'  nhalo =',nhalo
   allocate(gdata(3,nhalo))
@@ -69,29 +69,25 @@ program spincorr_sdss
   close(11)
 
   print*,''
-  print*,'rotate position and spin'
+  print*,'rotate galaxy position'
   do ihalo=1,nhalo
     g7 = gdata(:,ihalo)
     gdata(3,ihalo) = cen(3) + g7(1)*cos(dphi)      + g7(2)*sin(dphi);
     gdata(2,ihalo) = cen(2) + g7(1)*cos(dphi+pi/2) + g7(2)*sin(dphi+pi/2);
     gdata(1,ihalo) = cen(1) + g7(3);
-    !gdata(4,ihalo) =          g7(4);
-    !gdata(7,ihalo) =          g7(5)*cos(dphi)      + g7(6)*sin(dphi);
-    !gdata(6,ihalo) =          g7(5)*cos(dphi+pi/2) + g7(6)*sin(dphi+pi/2);
-    !gdata(5,ihalo) =          g7(7);
   enddo
 
   print*,''
-  print*,'reading weight file'
+  print*,'reading weight file'  ! ELUCID weight
   allocate(wgt(ngrid+2,ngrid,ngrid))
-  open(11,file=dir//'Weight5hR5_0500.bin',status='old',access='stream')
+  open(11,file=mangadir//'Weight5hR5_0500.bin',status='old',access='stream')
   read(11) wgt
   close(11)
 
   print*,''
-  print*,'reading remapping field'
+  print*,'reading remapping field'  ! inverse displacement
   allocate(idsp(3,ngrid,ngrid,ngrid))
-  open(11,file=dir//'0.000_xtoq_1.bin',status='old',access='stream')
+  open(11,file=simudir//'0.000_xtoq_1.bin',status='old',access='stream')
   read(11) idsp
   close(11)
 
@@ -105,7 +101,6 @@ program spincorr_sdss
     qpos=gdata(1:3,ihalo)
     if (minval(ig)>=1 .and. maxval(ig)<=ngrid) then
     if (wgt(ig(1),ig(2),ig(3))>0.5) then
-      !qpos=gdata(1:3,ihalo)+idsp(:,ig(1),ig(2),ig(3)) ! q space NGP
       idx1(:,2) = ig
       idx1(:,1)=idx1(:,2)-1 
       idx1(:,3)=idx1(:,2)+1 
@@ -125,7 +120,6 @@ program spincorr_sdss
         inew=inew+1
         qdata(1:3,inew)=gdata(1:3,ihalo)
         qdata(4:6,inew)=qpos
-        !qdata(8:10,inew)=gdata(5:7,ihalo)
       else
         print*, 'error index ',ihalo 
       endif
@@ -141,7 +135,7 @@ program spincorr_sdss
 
   print*,''
   print*,'  writing to file'
-  open(10,file=dir//'qdata.bin',status='replace',access='stream')
+  open(10,file=simudir//'qdata.bin',status='replace',access='stream')  ! halo q position
   write(10) inew
   write(10) qdata(:,1:inew)
   close(10)
@@ -153,12 +147,6 @@ program spincorr_sdss
   do ihalo=1,nhalo
     idx(:,ihalo,1)=ceiling(qdata(4:6,ihalo)) ! q space
     idx(:,ihalo,2)=ceiling(qdata(1:3,ihalo)) ! s space
-     ! below are randomized positions to test the error
-    !irand=modulo(ihalo+nhalo/2,nhalo)+1
-    !idx(1,ihalo,3)=ceiling(qdata(5,irand)+ngrid/2)
-    !idx(2,ihalo,3)=ceiling(qdata(6,irand)+ngrid/2)
-    !idx(3,ihalo,3)=ceiling(qdata(4,irand)+ngrid/2)
-    !idx(:,ihalo,3)=modulo(idx(:,ihalo,3),ngrid)+1
   enddo
   if (maxval(idx)>ngrid .or. minval(idx)<1) then
     print*, 'error: idx out of range'
@@ -169,7 +157,7 @@ program spincorr_sdss
 
   print*,''
   print*,'reading ELUCID IC'
-  open(11,file=dir//'cxyz_251_500_500.bin',status='old',access='stream')
+  open(11,file='../cxyz_251_500_500.bin',status='old',access='stream')
   read(11) rho_f
   close(11)
 
@@ -187,7 +175,6 @@ program spincorr_sdss
 
     kr=kx**2+ky**2+kz**2
     kr=max(kr,1.0/ngrid**2)
-    !kr=2*pi*kr/ngrid ! without sinc function
     pow=-4*pi/kr
     crho_f(i1,j1,k1)=crho_f(i1,j1,k1)*pow
   enddo
@@ -199,7 +186,8 @@ program spincorr_sdss
   print*,''
   print*,'reconstructing and correlating spin'
   allocate(jt(3,nhalo,n_rsmall,n_ratio,nband))
-  allocate(betaTT(nhalo,n_rsmall,n_ratio,nband))
+  allocate(betaTT(2,nhalo,n_rsmall,n_ratio,nband))
+
   do ii=1,n_rsmall
     print*, '  progress',ii,'/',n_rsmall
     call gaussian_fourier_filter(phi_k,r_small(ii))
@@ -212,24 +200,16 @@ program spincorr_sdss
       call spinfield
       do iband=1,nband
       do ihalo=1,nhalo
-        jt(:,ihalo,ii,jj,iband)=spin(:,idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))
-        betaTT(ihalo,ii,jj,iband)=beta(idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))
-        !theta(ihalo,iband)=ccc(qdata(8:10,ihalo),spin(:,idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband)))
-        !print*,ihalo,qdata(8,ihalo)
+        jt(:,ihalo,ii,jj,iband)=spin(:,idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))  ! reconstructed spin j_R
+        betaTT(1,ihalo,ii,jj,iband)=beta(idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))  ! tide environment parameter beta_TT
       enddo
       enddo
-      !do iband=1,nband
-      !  corr(ii,jj,iband)=sum(theta(:,iband))/nhalo
-      !enddo
       call system_clock(t2,t_rate) ! toc
-      !print*, r_small(ii), ratio_scale(jj), corr(ii,jj,:), real(t2-t1)/t_rate,'secs';
-
     enddo
   enddo
 
-  open(11,file=dir//'result.bin',status='replace',access='stream')
+  open(11,file=simudir//'result.bin',status='replace',access='stream')
   write(11) n_rsmall,n_ratio,r_small(1:n_rsmall),ratio_scale(1:n_ratio)
-  !write(11) corr
   write(11) jt
   write(11) betaTT
   close(11)
@@ -313,11 +293,6 @@ contains
       kr=2*pi*kr/box
       pow=exp(-kr**2*r_filter**2/2)**0.25 ! apply E-mode widxow function
       crho_f(i01,j01,k01)=phi_k(i01,j01,k01)*pow
-!if (k01==111.and.j01==111.and.i01==2) then
-!  print*,kx,ky,kz,kr
-!  print*,phi_k(i01,j01,k01)
-!  print*,crho_f(i01,j01,k01)
-!endif
     enddo
     enddo
     enddo

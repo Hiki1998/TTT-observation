@@ -1,4 +1,4 @@
-program spincorr_sdss
+program spincorr_manga
   use omp_lib
   !use parameters
   !use pencil_fft
@@ -15,29 +15,27 @@ program spincorr_sdss
 
   integer(4) t1,t2,t_rate,nhalo,ihalo,hgrid(3),irand,inew,ig(3),ii,jj,i,j,k
   integer(8) plan_fft_fine,plan_ifft_fine,idx1(3,3)
-  real kr,kx,ky,kz,pow,r_filter,rm,cen(3),dphi,qpos(3),g7(3),l3(3),dx(3,3),dx1(3),dx2(3)
+  real kr,kx,ky,kz,pow,r_filter,cen(3),dphi,qpos(3),g7(3),l3(3),dx(3,3),dx1(3),dx2(3)
 
   real rho_f(ngrid+2,ngrid,ngrid),phil(ngrid+2,ngrid,ngrid)
   complex crho_f(ngrid/2+1,ngrid,ngrid),phi_k(ngrid/2+1,ngrid,ngrid)
   real phis(ngrid+2,ngrid,ngrid) ! backup small scale phi
-  integer i0,j0,k0,i1,j1,k1,i2,j2,k2,n_rsmall,n_ratio,itemp,l1,iband,nband
+  integer i0,j0,k0,i1,j1,k1,i2,j2,k2,n_rsmall,n_ratio,itemp,l1
   real tide_s(3,3),tide_l(3,3),torque(3,3)
   real spin(3,ngrid,ngrid,ngrid),beta(ngrid,ngrid,ngrid)
   integer,allocatable :: idx(:,:,:)
   real,allocatable :: gdata(:,:)
-  real,allocatable :: theta(:,:),corr(:,:,:),r_small(:),ratio_scale(:),qdata(:,:)
-  real,allocatable :: idsp(:,:,:,:),wgt(:,:,:),jt(:,:,:,:,:),betaTT(:,:,:,:)
+  real,allocatable :: r_small(:),ratio_scale(:),qdata(:,:)
+  real,allocatable :: idsp(:,:,:,:),wgt(:,:,:),jR(:,:,:,:),betaTT(:,:,:)
   equivalence(rho_f,crho_f,phil)
 
 
   !call omp_set_num_threads(ncore)
   cen=[30,370,370] ! earth location
   dphi=-39.*pi/180.
-  nband=1
-  rm=2.0 ! mass bin ratio
-  n_rsmall=75
+  n_rsmall=100
   n_ratio=1
-  allocate(r_small(n_rsmall),ratio_scale(n_ratio),corr(n_rsmall,n_ratio,nband))
+  allocate(r_small(n_rsmall),ratio_scale(n_ratio))
   do i1=1,n_rsmall
     r_small(i1)=0.2+0.2*(i1-1)  ! r 0.2:15
   enddo
@@ -61,7 +59,7 @@ program spincorr_sdss
 
   print*,''
   print*,'reading MaNGA catalog'
-  open(11,file=mangadir//'manga_cat_EG_group_rsd.bin',status='old',access='stream')
+  open(11,file=mangadir//'manga_cat_group_rsd.bin',status='old',access='stream')
   read(11) nhalo
   print*,'  nhalo =',nhalo
   allocate(gdata(3,nhalo))
@@ -116,7 +114,7 @@ program spincorr_sdss
       enddo
       enddo
       enddo
-      if (minval(qpos)>0. .and. maxval(qpos)<real(ngrid) .and. gdata(5,ihalo)>-10000) then
+      if (minval(qpos)>0. .and. maxval(qpos)<real(ngrid)) then
         inew=inew+1
         qdata(1:3,inew)=gdata(1:3,ihalo)
         qdata(4:6,inew)=qpos
@@ -143,7 +141,7 @@ program spincorr_sdss
   print*,''
   print*,'generating grid index'
   nhalo=inew
-  allocate(idx(3,nhalo,nband),theta(nhalo,nband))
+  allocate(idx(3,nhalo,2))
   do ihalo=1,nhalo
     idx(:,ihalo,1)=ceiling(qdata(4:6,ihalo)) ! q space
     idx(:,ihalo,2)=ceiling(qdata(1:3,ihalo)) ! s space
@@ -185,8 +183,8 @@ program spincorr_sdss
 
   print*,''
   print*,'reconstructing and correlating spin'
-  allocate(jt(3,nhalo,n_rsmall,n_ratio,nband))
-  allocate(betaTT(2,nhalo,n_rsmall,n_ratio,nband))
+  allocate(jR(3,nhalo,n_rsmall,n_ratio))
+  allocate(betaTT(nhalo,n_rsmall,n_ratio))
 
   do ii=1,n_rsmall
     print*, '  progress',ii,'/',n_rsmall
@@ -198,21 +196,23 @@ program spincorr_sdss
       call gaussian_fourier_filter(phi_k,r_small(ii)*ratio_scale(jj))
       call sfftw_execute(plan_ifft_fine) ! phil is equivalenced to rho_f
       call spinfield
-      do iband=1,nband
       do ihalo=1,nhalo
-        jt(:,ihalo,ii,jj,iband)=spin(:,idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))  ! reconstructed spin j_R
-        betaTT(1,ihalo,ii,jj,iband)=beta(idx(1,ihalo,iband),idx(2,ihalo,iband),idx(3,ihalo,iband))  ! tide environment parameter beta_TT
-      enddo
+        jR(:,ihalo,ii,jj)=-spin(:,idx(1,ihalo,1),idx(2,ihalo,1),idx(3,ihalo,1))  ! reconstructed spin j_R
+        betaTT(ihalo,ii,jj)=beta(idx(1,ihalo,1),idx(2,ihalo,1),idx(3,ihalo,1))  ! tide environment parameter beta_TT
       enddo
       call system_clock(t2,t_rate) ! toc
     enddo
   enddo
 
-  open(11,file=simudir//'result.bin',status='replace',access='stream')
+  open(11,file=simudir//'jR.bin',status='replace',access='stream')
   write(11) n_rsmall,n_ratio,r_small(1:n_rsmall),ratio_scale(1:n_ratio)
-  write(11) jt
+  write(11) jR
+  close(11)
+
+  open(11,file=simudir//'betaTT.bin',status='replace',access='stream')
   write(11) betaTT
   close(11)
+
 
 call destroy_cubefft_plan
 
@@ -240,7 +240,6 @@ contains
     do i1=1,ngrid
       i2=modulo(i1,ngrid)+1
       i0=modulo(i1-2,ngrid)+1
-!print*,phis(1,1,1);stop
       tide_s(1,1)=phis(i2,j1,k1)-2*phis(i1,j1,k1)+phis(i0,j1,k1)
       tide_s(2,2)=phis(i1,j2,k1)-2*phis(i1,j1,k1)+phis(i1,j0,k1)
       tide_s(3,3)=phis(i1,j1,k2)-2*phis(i1,j1,k1)+phis(i1,j1,k0)
@@ -250,7 +249,6 @@ contains
       tide_s(2,1)=tide_s(1,2)
       tide_s(3,2)=tide_s(2,3)
       tide_s(1,3)=tide_s(3,1)
-!print*,tide_s
       tide_l(1,1)=phil(i2,j1,k1)-2*phil(i1,j1,k1)+phil(i0,j1,k1)
       tide_l(2,2)=phil(i1,j2,k1)-2*phil(i1,j1,k1)+phil(i1,j0,k1)
       tide_l(3,3)=phil(i1,j1,k2)-2*phil(i1,j1,k1)+phil(i1,j1,k0)
@@ -260,8 +258,6 @@ contains
       tide_l(2,1)=tide_l(1,2)
       tide_l(3,2)=tide_l(2,3)
       tide_l(1,3)=tide_l(3,1)
-!print*,tide_l
-!stop
       torque=-matmul(tide_s,tide_l)
       spin(1,i1,j1,k1)=-torque(2,3)+torque(3,2)
       spin(2,i1,j1,k1)=-torque(3,1)+torque(1,3)

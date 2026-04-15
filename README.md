@@ -46,9 +46,11 @@ No installation is required. The code can be compiled and executed directly.
 - Reconstruct the spin
 - Calculate the spin parameter
 
-### Expected output: reconstructed spin vectors and corresponding spin parameter values at different smoothing scales.
+### Expected output
+Reconstructed spin vectors and corresponding spin parameter values at different smoothing scales.
 
-### The runtime depends on the grid size and simulation resolution, typically ranging from minutes to hours on a standard desktop computer.
+### Runtime 
+Depend on the grid size and simulation resolution, typically ranging from minutes to hours on a standard desktop computer.
 
 ---
 

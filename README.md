@@ -1,5 +1,25 @@
-# spincorr_manga.f90: 
-## spin reconstruction and spin parameter calculation code
+# Spin Reconstruction and Spin Parameter Calculation Code
+# spincorr_manga.f90
+
+## Overview
+This code is used for spin reconstruction and spin parameter calculation in the associated manuscript. 
+
+---
+
+## System Requirements
+
+- Operating system: Linux (tested on Ubuntu 20.04)
+- Fortran compiler: ifort
+- No non-standard hardware is required
+
+---
+
+## Installation
+
+---
+
+
+## Instructions for use
 ### parameter setting
 - boxsize = 500 Mpc/h
 - grid number = 500
@@ -17,8 +37,8 @@
 - spinfield: tide field, reconstructed spin and spin paramter caculation
 - gaussian_fourier_filter: smooth potential field at scale r
 
+# Lagrangian Remapping Code
 # idsp.f90: 
-## Lagrangian remapping code
 ### pipeline
 - read CUBE2 constrained simulation information
 - derive particle q and x position

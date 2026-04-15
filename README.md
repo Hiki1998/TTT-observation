@@ -77,4 +77,9 @@ No installation is required. The code can be compiled and executed directly.
 - Read CUBE2 constrained simulation output, which using the ELUCID IC 'cxyz_251_500_500.bin';
 - Derive particle q and x position;
 - Calculate displacement field x-q;
-- Get inverse displacement field at grid. 
+- Get inverse displacement field at grid.
+
+---
+
+## License
+This code is released under the MIT License.

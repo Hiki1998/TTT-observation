@@ -59,7 +59,7 @@ program spincorr_manga
 
   print*,''
   print*,'reading MaNGA catalog'
-  open(11,file=mangadir//'manga_cat_group_rsd.bin',status='old',access='stream')
+  open(11,file=mangadir//'manga_cat_group.bin',status='old',access='stream')
   read(11) nhalo
   print*,'  nhalo =',nhalo
   allocate(gdata(3,nhalo))
